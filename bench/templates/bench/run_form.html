@@ -1,0 +1,13 @@
+{% extends "bench/base.html" %}
+{% block content %}
+<h1 class="h5 mb-3">New Run</h1>
+<form method="post" class="card">
+  <div class="card-body">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="text-end">
+      <button class="btn btn-primary">Save</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

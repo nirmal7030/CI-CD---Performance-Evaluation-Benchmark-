@@ -1,0 +1,23 @@
+{% extends "bench/base.html" %}
+{% block content %}
+<h1 class="h5 mb-3">Run #{{ run.id }}</h1>
+<div class="card">
+  <div class="card-body">
+    <dl class="row">
+      <dt class="col-sm-3">Pipeline</dt><dd class="col-sm-9">{{ run.get_pipeline_display }}</dd>
+      <dt class="col-sm-3">Branch</dt><dd class="col-sm-9">{{ run.branch }}</dd>
+      <dt class="col-sm-3">Commit</dt><dd class="col-sm-9"><code>{{ run.commit_sha }}</code></dd>
+      <dt class="col-sm-3">Run ID</dt><dd class="col-sm-9"><code>{{ run.run_id }}</code></dd>
+      <dt class="col-sm-3">LCE</dt><dd class="col-sm-9">{{ run.lce|default:"–" }}</dd>
+      <dt class="col-sm-3">PRT (s)</dt><dd class="col-sm-9">{{ run.prt_seconds|default:"–" }}</dd>
+      <dt class="col-sm-3">DEPT (s)</dt><dd class="col-sm-9">{{ run.dept_seconds|default:"–" }}</dd>
+      <dt class="col-sm-3">SMO</dt><dd class="col-sm-9">{{ run.smo_ratio|default:"–" }}</dd>
+      <dt class="col-sm-3">CLBC</dt><dd class="col-sm-9">{{ run.clbc_ratio|default:"–" }}</dd>
+      <dt class="col-sm-3">Notes</dt><dd class="col-sm-9"><pre class="mb-0">{{ run.notes|default:"" }}</pre></dd>
+    </dl>
+  </div>
+</div>
+<div class="mt-3">
+  <a href="/runs/" class="btn btn-outline-secondary btn-sm">← Back</a>
+</div>
+{% endblock %}

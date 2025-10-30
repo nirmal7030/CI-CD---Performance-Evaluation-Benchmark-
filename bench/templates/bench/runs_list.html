@@ -1,0 +1,48 @@
+{% extends "bench/base.html" %}
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+  <h1 class="h4 mb-0">Runs</h1>
+  <a href="/runs/new/" class="btn btn-primary btn-sm ms-auto">+ New Run</a>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-auto">
+    <select name="pipeline" class="form-select form-select-sm">
+      <option value="">All Pipelines</option>
+      <option value="jenkins" {% if pipeline == 'jenkins' %}selected{% endif %}>Jenkins</option>
+      <option value="github" {% if pipeline == 'github' %}selected{% endif %}>GitHub Actions</option>
+      <option value="codepipeline" {% if pipeline == 'codepipeline' %}selected{% endif %}>AWS CodePipeline</option>
+    </select>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary btn-sm">Filter</button>
+  </div>
+</form>
+
+<div class="table-responsive">
+<table class="table table-sm align-middle">
+  <thead>
+    <tr>
+      <th>ID</th><th>Pipeline</th><th>Branch</th><th>LCE</th><th>PRT(s)</th><th>DEPT(s)</th><th>SMO</th><th>CLBC</th><th>Created</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in runs %}
+    <tr>
+      <td><a href="/runs/{{ r.id }}/">#{{ r.id }}</a></td>
+      <td>{{ r.get_pipeline_display }}</td>
+      <td>{{ r.branch }}</td>
+      <td>{{ r.lce|default:"–" }}</td>
+      <td>{{ r.prt_seconds|default:"–" }}</td>
+      <td>{{ r.dept_seconds|default:"–" }}</td>
+      <td>{{ r.smo_ratio|default:"–" }}</td>
+      <td>{{ r.clbc_ratio|default:"–" }}</td>
+      <td>{{ r.created_at|date:"Y-m-d H:i" }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="9" class="text-center text-muted">No runs yet</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

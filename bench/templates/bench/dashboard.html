@@ -1,0 +1,92 @@
+{% extends "bench/base.html" %}
+{% block content %}
+<h1 class="h4 mb-3">Dashboard</h1>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-2">
+    <div class="card kpi-card">
+      <div class="card-body">
+        <div class="text-muted small">Total Runs</div>
+        <div class="fs-4">{{ kpis.count|default:0 }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card kpi-card">
+      <div class="card-body">
+        <div class="text-muted small">Avg LCE</div>
+        <div class="fs-4">{{ kpis.avg_lce|floatformat:2|default:"0.00" }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card kpi-card">
+      <div class="card-body">
+        <div class="text-muted small">Avg PRT (s)</div>
+        <div class="fs-4">{{ kpis.avg_prt|floatformat:2|default:"0.00" }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card kpi-card">
+      <div class="card-body">
+        <div class="text-muted small">Avg DEPT (s)</div>
+        <div class="fs-4">{{ kpis.avg_dept|floatformat:2|default:"0.00" }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card kpi-card">
+      <div class="card-body">
+        <div class="text-muted small">Avg SMO</div>
+        <div class="fs-4">{{ kpis.avg_smo|floatformat:2|default:"0.00" }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card kpi-card">
+      <div class="card-body">
+        <div class="text-muted small">Avg CLBC</div>
+        <div class="fs-4">{{ kpis.avg_clbc|floatformat:2|default:"0.00" }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h2 class="h6">Averages by Pipeline</h2>
+    <canvas id="pipelineChart" height="120"></canvas>
+  </div>
+</div>
+
+<div class="text-end">
+  <a href="/runs/" class="btn btn-outline-secondary btn-sm">View all runs →</a>
+</div>
+
+<script>
+const data = {{ by_pipeline|safe }};
+const labels = data.map(d => d.pipeline);
+const avgLCE = data.map(d => d.avg_lce || 0);
+const avgPRT = data.map(d => d.avg_prt || 0);
+const avgDEPT = data.map(d => d.avg_dept || 0);
+const avgSMO = data.map(d => d.avg_smo || 0);
+const avgCLBC = data.map(d => d.avg_clbc || 0);
+
+const ctx = document.getElementById('pipelineChart');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels,
+    datasets: [
+      { label: 'LCE', data: avgLCE },
+      { label: 'PRT (s)', data: avgPRT },
+      { label: 'DEPT (s)', data: avgDEPT },
+      { label: 'SMO', data: avgSMO },
+      { label: 'CLBC', data: avgCLBC },
+    ]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+</script>
+{% endblock %}

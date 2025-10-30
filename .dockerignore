@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pytest_cache/
+.venv/
+
+# Django
+staticfiles/
+media/
+
+# VCS / OS
+.git
+.gitignore
+.DS_Store
+*.log
