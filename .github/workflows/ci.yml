@@ -1,0 +1,58 @@
+name: CI and Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run tests
+        run: pytest -q
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Deploy container on EC2 via SSM
+        env:
+          EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+          SECRET_KEY:      ${{ secrets.SECRET_KEY }}
+          BENCH_API_KEY:   ${{ secrets.BENCH_API_KEY }}
+        run: |
+          CMD='
+            set -e
+            cd /opt/cicd-benchmark || exit 1
+            git pull --rebase || true
+            /usr/bin/docker build -t cicd-benchmark:prod .
+            /usr/bin/docker rm -f cicdbench || true
+            /usr/bin/docker run -d --name cicdbench -p 80:8000 \
+              -e DEBUG=0 \
+              -e SECRET_KEY='"$SECRET_KEY"' \
+              -e ALLOWED_HOSTS="*" \
+              -e BENCH_API_KEY='"$BENCH_API_KEY"' \
+              cicd-benchmark:prod
+          '
+          aws ssm send-command \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Redeploy cicd-benchmark" \
+            --parameters commands=["$CMD"]

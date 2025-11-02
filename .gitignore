@@ -1,0 +1,29 @@
+@'
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*.egg-info/
+db.sqlite3
+staticfiles/
+media/
+
+# Test cache
+.pytest_cache/
+
+# Envs & IDE
+.venv/
+env/
+venv/
+.vscode/
+'@ | Out-File -Encoding UTF8 .gitignore
