@@ -10,10 +10,10 @@ terraform {
 
 provider "aws" {
   region  = var.aws_region
-  profile = "cicd-new"  # <— uses your named AWS CLI profile
+  profile = "cicd-new" # uses your named CLI profile
 }
 
-# Use the default VPC + one subnet
+# ----- Networking: use default VPC + one subnet -----
 data "aws_vpc" "default" {
   default = true
 }
@@ -25,12 +25,12 @@ data "aws_subnets" "default" {
   }
 }
 
-# Security Group: HTTP open (80); SSH optional (lock to your IP ideally)
 resource "aws_security_group" "web_sg" {
   name        = "${var.project_name}-sg"
   description = "Allow HTTP and (optional) SSH"
   vpc_id      = data.aws_vpc.default.id
 
+  # HTTP
   ingress {
     description = "HTTP"
     from_port   = 80
@@ -39,6 +39,7 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # SSH (effectively blocked by default 0.0.0.0/32; set to your_ip/32 if needed)
   ingress {
     description = "SSH"
     from_port   = 22
@@ -47,6 +48,7 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = [var.ssh_cidr]
   }
 
+  # Egress all
   egress {
     description = "All outbound"
     from_port   = 0
@@ -56,11 +58,10 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# IAM role so EC2 has SSM (no SSH keys needed)
+# ----- IAM for EC2 to be SSM-managed -----
 data "aws_iam_policy_document" "ec2_trust" {
   statement {
     actions = ["sts:AssumeRole"]
-
     principals {
       type        = "Service"
       identifiers = ["ec2.amazonaws.com"]
@@ -83,7 +84,7 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
-# Latest Amazon Linux 2023 AMI
+# ----- AMI -----
 data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["137112412989"] # Amazon
@@ -94,16 +95,26 @@ data "aws_ami" "al2023" {
   }
 }
 
-# User data to install Docker, clone repo, build and run container
+# ----- User data (install/enable SSM Agent, Docker, run app) -----
 locals {
   user_data = <<-EOF
     #!/bin/bash
     set -e
+
+    # Base updates + tools
     dnf update -y
     dnf install -y docker git
+
+    # Ensure SSM Agent is installed & running (AL2023 usually has it, force-install to be safe)
+    dnf install -y amazon-ssm-agent || true
+    systemctl enable amazon-ssm-agent
+    systemctl restart amazon-ssm-agent
+
+    # Docker
     systemctl enable docker
     systemctl start docker
 
+    # App code
     cd /opt
     if [ ! -d cicd-benchmark ]; then
       git clone https://github.com/${var.github_user}/${var.github_repo}.git cicd-benchmark
@@ -114,9 +125,9 @@ locals {
     fi
     cd cicd-benchmark
 
+    # Build + run container
     /usr/bin/docker build -t cicd-benchmark:prod .
     /usr/bin/docker rm -f cicdbench || true
-
     /usr/bin/docker run -d --name cicdbench -p 80:8000 \
       -e DEBUG=0 \
       -e SECRET_KEY="${var.secret_key}" \
@@ -126,6 +137,7 @@ locals {
   EOF
 }
 
+# ----- EC2 instance -----
 resource "aws_instance" "web" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = var.instance_type
@@ -134,6 +146,8 @@ resource "aws_instance" "web" {
   iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
   associate_public_ip_address = true
   user_data                   = local.user_data
+
+  user_data_replace_on_change = true
 
   tags = {
     Name = var.project_name
