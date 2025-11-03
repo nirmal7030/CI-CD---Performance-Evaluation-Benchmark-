@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       build_duration: ${{ steps.build_step.outputs.build_duration }}
-      test_duration: ${{ steps.test_step.outputs.test_duration }}
+      test_duration:  ${{ steps.test_step.outputs.test_duration }}
     steps:
       - uses: actions/checkout@v4
 
@@ -109,18 +109,32 @@ jobs:
         run: |
           set -e
 
-          # Normalise base URL: if it doesn't start with http, prepend http://
+          # ---- Normalise base URL from secret ----
           BASE_URL="$APP_BASE_URL"
-          if [[ "$BASE_URL" != http* ]]; then
+
+          # Strip quotes and whitespace
+          BASE_URL="${BASE_URL%/}"        # drop trailing slash
+          BASE_URL="${BASE_URL%\"}"       # drop trailing quote
+          BASE_URL="${BASE_URL#\"}"       # drop leading quote
+          BASE_URL="$(echo "$BASE_URL" | tr -d '[:space:]')"
+
+          if [ -z "$BASE_URL" ]; then
+            echo "ERROR: APP_BASE_URL secret is empty or only spaces."
+            exit 1
+          fi
+
+          # Add scheme if missing
+          if [[ "$BASE_URL" != http://* && "$BASE_URL" != https://* ]]; then
             BASE_URL="http://$BASE_URL"
           fi
+
+          echo "Using BASE_URL=$BASE_URL (masked in logs by GitHub)"
 
           # Ensure numeric defaults
           BUILD_DUR=${BUILD_DUR:-0}
           TEST_DUR=${TEST_DUR:-0}
           DEPLOY_DUR=${DEPLOY_DUR:-0}
 
-          echo "BASE_URL=$BASE_URL"
           echo "BUILD_DUR=$BUILD_DUR"
           echo "TEST_DUR=$TEST_DUR"
           echo "DEPLOY_DUR=$DEPLOY_DUR"
