@@ -2,7 +2,7 @@ name: CI and Deploy
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
 
 jobs:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       build_duration: ${{ steps.build_step.outputs.build_duration }}
-      test_duration:  ${{ steps.test_step.outputs.test_duration }}
+      test_duration: ${{ steps.test_step.outputs.test_duration }}
     steps:
       - uses: actions/checkout@v4
 
@@ -109,11 +109,18 @@ jobs:
         run: |
           set -e
 
+          # Normalise base URL: if it doesn't start with http, prepend http://
+          BASE_URL="$APP_BASE_URL"
+          if [[ "$BASE_URL" != http* ]]; then
+            BASE_URL="http://$BASE_URL"
+          fi
+
           # Ensure numeric defaults
           BUILD_DUR=${BUILD_DUR:-0}
           TEST_DUR=${TEST_DUR:-0}
           DEPLOY_DUR=${DEPLOY_DUR:-0}
 
+          echo "BASE_URL=$BASE_URL"
           echo "BUILD_DUR=$BUILD_DUR"
           echo "TEST_DUR=$TEST_DUR"
           echo "DEPLOY_DUR=$DEPLOY_DUR"
@@ -159,7 +166,7 @@ jobs:
           echo "Payload to send:"
           cat payload.json
 
-          curl -sS -X POST "$APP_BASE_URL/api/metrics/ingest" \
+          curl -sS -X POST "$BASE_URL/api/metrics/ingest" \
             -H "Content-Type: application/json" \
             -H "X-Bench-Key: $BENCH_API_KEY" \
             --data @payload.json
