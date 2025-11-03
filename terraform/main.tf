@@ -10,10 +10,10 @@ terraform {
 
 provider "aws" {
   region  = var.aws_region
-  profile = "cicd-new" # uses your named CLI profile
+  profile = "cicd-new"
 }
 
-# ----- Networking: use default VPC + one subnet -----
+# ---- Data: Default VPC + all subnets ----
 data "aws_vpc" "default" {
   default = true
 }
@@ -25,12 +25,29 @@ data "aws_subnets" "default" {
   }
 }
 
+# Look up each subnet to get its availability_zone
+data "aws_subnet" "all" {
+  for_each = toset(data.aws_subnets.default.ids)
+  id       = each.value
+}
+
+# Pick any AZ except 1e (t3.small not available for your account there)
+locals {
+  project_name  = var.project_name
+  preferred_azs = ["us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d", "us-east-1f"]
+  good_subnet_ids = [
+    for s in data.aws_subnet.all : s.id
+    if contains(local.preferred_azs, s.availability_zone)
+  ]
+  chosen_subnet_id = length(local.good_subnet_ids) > 0 ? local.good_subnet_ids[0] : data.aws_subnets.default.ids[0]
+}
+
+# ---- Security Group ----
 resource "aws_security_group" "web_sg" {
-  name        = "${var.project_name}-sg"
+  name        = "${local.project_name}-sg"
   description = "Allow HTTP and (optional) SSH"
   vpc_id      = data.aws_vpc.default.id
 
-  # HTTP
   ingress {
     description = "HTTP"
     from_port   = 80
@@ -39,16 +56,15 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # SSH (effectively blocked by default 0.0.0.0/32; set to your_ip/32 if needed)
   ingress {
     description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.ssh_cidr]
+    # lock down later to your IP; for now keep closed by default:
+    cidr_blocks = ["0.0.0.0/32"]
   }
 
-  # Egress all
   egress {
     description = "All outbound"
     from_port   = 0
@@ -58,7 +74,7 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# ----- IAM for EC2 to be SSM-managed -----
+# ---- IAM for SSM on EC2 ----
 data "aws_iam_policy_document" "ec2_trust" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -70,7 +86,7 @@ data "aws_iam_policy_document" "ec2_trust" {
 }
 
 resource "aws_iam_role" "ec2_role" {
-  name               = "${var.project_name}-ec2-role"
+  name               = "${local.project_name}-ec2-role"
   assume_role_policy = data.aws_iam_policy_document.ec2_trust.json
 }
 
@@ -80,41 +96,37 @@ resource "aws_iam_role_policy_attachment" "ssm_core" {
 }
 
 resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "${var.project_name}-ec2-profile"
+  name = "${local.project_name}-ec2-profile"
   role = aws_iam_role.ec2_role.name
 }
 
-# ----- AMI -----
+# ---- Latest Amazon Linux 2023 AMI ----
 data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["137112412989"] # Amazon
-
   filter {
     name   = "name"
     values = ["al2023-ami-*-x86_64"]
   }
 }
 
-# ----- User data (install/enable SSM Agent, Docker, run app) -----
+# ---- EC2 user-data (installs Docker + SSM, runs your app) ----
 locals {
   user_data = <<-EOF
     #!/bin/bash
     set -e
 
-    # Base updates + tools
+    # Update and install Docker, Git, SSM Agent
     dnf update -y
-    dnf install -y docker git
+    dnf install -y docker git amazon-ssm-agent
 
-    # Ensure SSM Agent is installed & running (AL2023 usually has it, force-install to be safe)
-    dnf install -y amazon-ssm-agent || true
-    systemctl enable amazon-ssm-agent
-    systemctl restart amazon-ssm-agent
-
-    # Docker
+    # Enable services
     systemctl enable docker
     systemctl start docker
+    systemctl enable amazon-ssm-agent
+    systemctl start  amazon-ssm-agent
 
-    # App code
+    # Fetch app code
     cd /opt
     if [ ! -d cicd-benchmark ]; then
       git clone https://github.com/${var.github_user}/${var.github_repo}.git cicd-benchmark
@@ -125,7 +137,7 @@ locals {
     fi
     cd cicd-benchmark
 
-    # Build + run container
+    # Build & run container
     /usr/bin/docker build -t cicd-benchmark:prod .
     /usr/bin/docker rm -f cicdbench || true
     /usr/bin/docker run -d --name cicdbench -p 80:8000 \
@@ -137,19 +149,26 @@ locals {
   EOF
 }
 
-# ----- EC2 instance -----
+# ---- EC2 instance (now using a supported AZ) ----
 resource "aws_instance" "web" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = var.instance_type
-  subnet_id                   = data.aws_subnets.default.ids[0]
+  subnet_id                   = local.chosen_subnet_id
   vpc_security_group_ids      = [aws_security_group.web_sg.id]
   iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
   associate_public_ip_address = true
   user_data                   = local.user_data
 
+  # Recreate instance automatically if user_data changes
   user_data_replace_on_change = true
 
   tags = {
-    Name = var.project_name
+    Name = local.project_name
   }
 }
+
+# ---- Helpful outputs ----
+output "public_ip" { value = aws_instance.web.public_ip }
+output "public_dns" { value = aws_instance.web.public_dns }
+output "http_url" { value = "http://${aws_instance.web.public_dns}/" }
+output "instance_id" { value = aws_instance.web.id }
