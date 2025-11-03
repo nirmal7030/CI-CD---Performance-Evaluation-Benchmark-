@@ -24,20 +24,22 @@ jobs:
       - name: Install dependencies (timed)
         id: build_step
         run: |
+          set -e
           START=$(date +%s)
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           END=$(date +%s)
-          echo "build_duration=$((END-START))" >> $GITHUB_OUTPUT
+          echo "build_duration=$((END-START))" >> "$GITHUB_OUTPUT"
 
       # ---- measure test time ----
       - name: Run tests (timed)
         id: test_step
         run: |
+          set -e
           START=$(date +%s)
           pytest -q
           END=$(date +%s)
-          echo "test_duration=$((END-START))" >> $GITHUB_OUTPUT
+          echo "test_duration=$((END-START))" >> "$GITHUB_OUTPUT"
 
   deploy:
     if: github.ref == 'refs/heads/main'
@@ -61,8 +63,8 @@ jobs:
         run: |
           set -e
 
-          # Build SSM command JSON (on the runner)
-          cat > ssm-commands.json <<'JSON'
+          # Build SSM command JSON on the runner (ENV will expand here)
+          cat > ssm-commands.json <<EOF
           {
             "commands": [
               "set -e",
@@ -78,28 +80,28 @@ jobs:
                 cicd-benchmark:prod"
             ]
           }
-          JSON
+          EOF
 
           START=$(date +%s)
-          aws ssm send-command \
+
+          CMD_ID=$(aws ssm send-command \
             --instance-ids "$EC2_INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --comment "Redeploy cicd-benchmark" \
             --parameters file://ssm-commands.json \
-            --query "Command.CommandId" --output text > cmdid.txt
+            --query "Command.CommandId" --output text)
 
-          CMD_ID=$(cat cmdid.txt)
           aws ssm wait command-executed \
             --command-id "$CMD_ID" \
             --instance-id "$EC2_INSTANCE_ID"
 
           END=$(date +%s)
-          echo "deploy_duration=$((END-START))" >> $GITHUB_OUTPUT
+          echo "deploy_duration=$((END-START))" >> "$GITHUB_OUTPUT"
 
       # ---- POST NOVEL METRICS (LCE, PRT, SMO, DEPT, CLBC) TO DJANGO ----
       - name: Post novel metrics to app
         env:
-          APP_BASE_URL:  ${{ secrets.APP_BASE_URL }}   # e.g. http://ec2-xx-xx-xx-xx.compute-1.amazonaws.com
+          APP_BASE_URL:  ${{ secrets.APP_BASE_URL }}   # e.g. http://ec2-100-28-220-183.compute-1.amazonaws.com
           BENCH_API_KEY: ${{ secrets.BENCH_API_KEY }}
           BUILD_DUR:     ${{ needs.test.outputs.build_duration }}
           TEST_DUR:      ${{ needs.test.outputs.test_duration }}
@@ -107,35 +109,35 @@ jobs:
         run: |
           set -e
 
-          # Make sure we have numeric values
+          # Ensure numeric defaults
           BUILD_DUR=${BUILD_DUR:-0}
           TEST_DUR=${TEST_DUR:-0}
           DEPLOY_DUR=${DEPLOY_DUR:-0}
 
-          # Example simple mapping from timings to novel metrics:
-          # These are placeholders you can refine based on your thesis formulas.
-          # LCE  → higher if build is fast (just a rough heuristic)
-          LCE=$(python - <<PY
-bd = float("${BUILD_DUR}")
-val = 100.0 - min(40.0, bd * 0.5)
-print(round(max(0.0, min(100.0, val)), 2))
-PY
-)
+          echo "BUILD_DUR=$BUILD_DUR"
+          echo "TEST_DUR=$TEST_DUR"
+          echo "DEPLOY_DUR=$DEPLOY_DUR"
 
-          # PRT (pipeline recovery time) ~ use deploy duration for now
-          PRT=${DEPLOY_DUR}
+          # ----- Simple approximations for your novel metrics -----
+          # LCE (Layer Cache Efficiency): high if build is fast
+          LCE=$(( 100 - BUILD_DUR / 2 ))
+          if [ "$LCE" -lt 0 ]; then LCE=0; fi
+          if [ "$LCE" -gt 100 ]; then LCE=100; fi
 
-          # SMO (secrets overhead) ~ constant placeholder (seconds)
-          SMO=1.0
+          # PRT (Pipeline Recovery Time): use deploy duration for now
+          PRT=$DEPLOY_DUR
 
-          # DEPT (dynamic env provisioning) ~ use a part of deploy duration
-          DEPT=${DEPLOY_DUR}
+          # SMO (Secrets Management Overhead): constant placeholder in seconds
+          SMO=1
 
-          # CLBC (cross-layer consistency) ~ 100 if pipeline succeeded
-          CLBC=100.0
+          # DEPT (Dynamic Env Provisioning Time): use deploy duration
+          DEPT=$DEPLOY_DUR
+
+          # CLBC (Cross-Layer Build Consistency): 100 if pipeline succeeded
+          CLBC=100
 
           # Build JSON payload for /api/metrics/ingest
-          cat > payload.json <<JSON
+          cat > payload.json <<EOF
           {
             "source": "github",
             "workflow": "${{ github.workflow }}",
@@ -152,7 +154,7 @@ PY
 
             "notes": "auto-ingest of novel metrics from CI"
           }
-JSON
+          EOF
 
           echo "Payload to send:"
           cat payload.json
