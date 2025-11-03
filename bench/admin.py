@@ -1,8 +1,11 @@
 from django.contrib import admin
-from .models import Run
+from .models import Metric
 
-@admin.register(Run)
-class RunAdmin(admin.ModelAdmin):
-    list_display = ("id", "pipeline", "branch", "lce", "prt_seconds", "dept_seconds", "smo_ratio", "clbc_ratio", "created_at")
-    list_filter = ("pipeline", "branch", "created_at")
-    search_fields = ("commit_sha", "run_id", "notes")
+@admin.register(Metric)
+class MetricAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "pipeline_total_s", "build_duration_s", "test_duration_s",
+                    "deploy_duration_s", "app_latency_s", "success_flag", "cloud_consistency",
+                    "branch", "workflow")
+    list_filter  = ("source", "workflow", "branch")
+    search_fields = ("commit_sha", "notes")
+    ordering = ("-created_at",)

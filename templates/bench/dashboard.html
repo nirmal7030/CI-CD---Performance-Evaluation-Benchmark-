@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>CI/CD Novel Metrics Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: system-ui; margin: 24px; background: #f7f9fb; }
+    h1 { margin-bottom: 16px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .card { background: #fff; border-radius: 12px; padding: 14px 16px; box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+    .label { color: #777; text-transform: uppercase; font-size: 0.8rem; }
+    .value { font-size: 1.5rem; font-weight: 600; margin-top: 6px; }
+    .unit { font-size: 0.9rem; color: #999; margin-left: 3px; }
+    .panel { background: #fff; border-radius: 12px; padding: 16px; margin-top: 20px; box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+  </style>
+</head>
+<body>
+  <h1>Novel Metrics Dashboard</h1>
+  <div class="cards">
+    <div class="card"><div class="label">Layer Cache Efficiency (LCE)</div><div class="value"><span id="lce">0</span><span class="unit">%</span></div></div>
+    <div class="card"><div class="label">Pipeline Recovery Time (PRT)</div><div class="value"><span id="prt">0</span><span class="unit">s</span></div></div>
+    <div class="card"><div class="label">Secrets Mgmt Overhead (SMO)</div><div class="value"><span id="smo">0</span><span class="unit">s</span></div></div>
+    <div class="card"><div class="label">Dynamic Env Time (DEPT)</div><div class="value"><span id="dept">0</span><span class="unit">s</span></div></div>
+    <div class="card"><div class="label">Cross-Layer Consistency (CLBC)</div><div class="value"><span id="clbc">0</span><span class="unit">%</span></div></div>
+  </div>
+
+  <div class="panel">
+    <h3>Novel Metrics Trends</h3>
+    <canvas id="novelChart" height="120"></canvas>
+  </div>
+
+  <script>
+    async function load(){
+      const res = await fetch('/api/metrics/data');
+      const d = await res.json();
+      document.getElementById('lce').textContent = d.avg_lce;
+      document.getElementById('prt').textContent = d.avg_prt;
+      document.getElementById('smo').textContent = d.avg_smo;
+      document.getElementById('dept').textContent = d.avg_dept;
+      document.getElementById('clbc').textContent = d.avg_clbc;
+
+      const labels = d.rows.map(r => new Date(r.t).toLocaleTimeString());
+      const datasets = [
+        { label:'LCE (%)',  data:d.rows.map(r=>r.lce) },
+        { label:'PRT (s)',  data:d.rows.map(r=>r.prt) },
+        { label:'SMO (s)',  data:d.rows.map(r=>r.smo) },
+        { label:'DEPT (s)', data:d.rows.map(r=>r.dept) },
+        { label:'CLBC (%)', data:d.rows.map(r=>r.clbc) }
+      ].map(ds => ({ ...ds, borderWidth:2 }));
+
+      new Chart(document.getElementById('novelChart'), {
+        type:'line',
+        data:{ labels, datasets },
+        options:{ responsive:true, interaction:{mode:'index',intersect:false}, plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true}} }
+      });
+    }
+    load();
+  </script>
+</body>
+</html>

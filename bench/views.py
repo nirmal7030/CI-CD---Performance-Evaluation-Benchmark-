@@ -1,75 +1,74 @@
-from django.shortcuts import render, get_object_or_404, redirect
-from django.db.models import Avg, Count
-from django.http import JsonResponse, HttpResponseForbidden
-from .models import Run
-from .forms import RunForm
+import json
+import statistics
 from django.conf import settings
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from .models import Metric
+
+
+@csrf_exempt
+def api_ingest(request):
+    """Receive metric data from CI/CD pipeline or API client."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST only"}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    # Simple API key check for security
+    api_key = request.headers.get("X-Bench-Key")
+    if api_key != settings.BENCH_API_KEY:
+        return JsonResponse({"error": "Unauthorized"}, status=403)
+
+    Metric.objects.create(
+        source=payload.get("source", "manual"),
+        workflow=payload.get("workflow", ""),
+        run_id=payload.get("run_id", ""),
+        branch=payload.get("branch", ""),
+        commit_sha=payload.get("commit_sha", ""),
+        layer_cache_efficiency=payload.get("lce"),
+        pipeline_recovery_time=payload.get("prt"),
+        secrets_mgmt_overhead=payload.get("smo"),
+        dynamic_env_time=payload.get("dept"),
+        cross_layer_consistency=payload.get("clbc"),
+        notes=payload.get("notes", ""),
+    )
+    return JsonResponse({"status": "stored"})
+
+
+def api_metrics_data(request):
+    """Return aggregated metrics for dashboard display."""
+    qs = Metric.objects.order_by("-created_at")[:100]
+    rows = [
+        {
+            "t": m.created_at.isoformat(),
+            "lce": m.layer_cache_efficiency,
+            "prt": m.pipeline_recovery_time,
+            "smo": m.secrets_mgmt_overhead,
+            "dept": m.dynamic_env_time,
+            "clbc": m.cross_layer_consistency,
+        }
+        for m in reversed(qs)
+    ]
+
+    def avg(vals):
+        clean = [v for v in vals if v is not None]
+        return round(statistics.fmean(clean), 2) if clean else 0.0
+
+    data = {
+        "count": Metric.objects.count(),
+        "avg_lce":  avg([r["lce"] for r in rows]),
+        "avg_prt":  avg([r["prt"] for r in rows]),
+        "avg_smo":  avg([r["smo"] for r in rows]),
+        "avg_dept": avg([r["dept"] for r in rows]),
+        "avg_clbc": avg([r["clbc"] for r in rows]),
+        "rows": rows,
+    }
+    return JsonResponse(data)
+from django.shortcuts import render
 
 def dashboard(request):
-    # KPIs
-    kpis = Run.objects.aggregate(
-        avg_lce=Avg('lce'),
-        avg_prt=Avg('prt_seconds'),
-        avg_dept=Avg('dept_seconds'),
-        avg_smo=Avg('smo_ratio'),
-        avg_clbc=Avg('clbc_ratio'),
-        count=Count('id'),
-    )
-    # Data for charts: average per pipeline
-    by_pipeline = (Run.objects
-                   .values('pipeline')
-                   .annotate(avg_lce=Avg('lce'),
-                             avg_prt=Avg('prt_seconds'),
-                             avg_dept=Avg('dept_seconds'),
-                             avg_smo=Avg('smo_ratio'),
-                             avg_clbc=Avg('clbc_ratio'),
-                             cnt=Count('id'))
-                   .order_by('pipeline'))
-    return render(request, "bench/dashboard.html", {"kpis": kpis, "by_pipeline": list(by_pipeline)})
+    return render(request, "bench/dashboard.html")
 
-def runs_list(request):
-    pipeline = request.GET.get('pipeline')
-    runs = Run.objects.all().order_by("-created_at")
-    if pipeline:
-        runs = runs.filter(pipeline=pipeline)
-    return render(request, "bench/runs_list.html", {"runs": runs, "pipeline": pipeline})
-
-def run_detail(request, pk):
-    run = get_object_or_404(Run, pk=pk)
-    return render(request, "bench/run_detail.html", {"run": run})
-
-def run_new(request):
-    if request.method == "POST":
-        form = RunForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect("runs_list")
-    else:
-        form = RunForm()
-    return render(request, "bench/run_form.html", {"form": form})
-
-# Simple ingest API: send JSON with an API key
-def api_ingest(request):
-    if request.method != "POST":
-        return JsonResponse({"error": "POST required"}, status=405)
-
-    api_key = request.headers.get("X-API-KEY") or request.GET.get("api_key")
-    expected = getattr(settings, "BENCH_API_KEY", None)
-    if not expected or api_key != expected:
-        return HttpResponseForbidden("Invalid API key")
-
-    import json
-    data = json.loads(request.body or "{}")
-    run = Run.objects.create(
-        pipeline=data.get("pipeline", "github"),
-        branch=data.get("branch", "main"),
-        commit_sha=data.get("commit_sha", ""),
-        run_id=data.get("run_id", ""),
-        lce=data.get("lce"),
-        prt_seconds=data.get("prt_seconds"),
-        dept_seconds=data.get("dept_seconds"),
-        smo_ratio=data.get("smo_ratio"),
-        clbc_ratio=data.get("clbc_ratio"),
-        notes=data.get("notes", ""),
-    )
-    return JsonResponse({"status": "ok", "id": run.id})
