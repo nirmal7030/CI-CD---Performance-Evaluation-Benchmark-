@@ -6,24 +6,109 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: system-ui; margin: 24px; background: #f7f9fb; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+           margin: 24px; background: #f7f9fb; }
     h1 { margin-bottom: 16px; }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
-    .card { background: #fff; border-radius: 12px; padding: 14px 16px; box-shadow: 0 2px 6px rgba(0,0,0,.1); }
-    .label { color: #777; text-transform: uppercase; font-size: 0.8rem; }
-    .value { font-size: 1.5rem; font-weight: 600; margin-top: 6px; }
-    .unit { font-size: 0.9rem; color: #999; margin-left: 3px; }
-    .panel { background: #fff; border-radius: 12px; padding: 16px; margin-top: 20px; box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.08);
+    }
+    .label {
+      color: #777;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+    }
+    .value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+    .unit {
+      font-size: 0.9rem;
+      color: #999;
+      margin-left: 3px;
+    }
+    .panel {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.08);
+    }
+
+    /* Tabs */
+    .tabs {
+      display: inline-flex;
+      border-radius: 999px;
+      background: #e5edf7;
+      padding: 4px;
+      margin-bottom: 16px;
+    }
+    .tab {
+      border: none;
+      background: transparent;
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: #365074;
+    }
+    .tab.active {
+      background: #ffffff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .subtitle {
+      color: #6b7280;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+    }
   </style>
 </head>
 <body>
   <h1>Novel Metrics Dashboard</h1>
+
+  <!-- Pipeline tabs -->
+  <div class="tabs">
+    <button class="tab active" data-source="github">GitHub Actions</button>
+    <button class="tab" data-source="jenkins">Jenkins</button>
+    <button class="tab" data-source="codepipeline">AWS CodePipeline</button>
+  </div>
+
+  <div class="subtitle" id="activeLabel">
+    Showing metrics for <strong>GitHub Actions</strong>
+  </div>
+
   <div class="cards">
-    <div class="card"><div class="label">Layer Cache Efficiency (LCE)</div><div class="value"><span id="lce">0</span><span class="unit">%</span></div></div>
-    <div class="card"><div class="label">Pipeline Recovery Time (PRT)</div><div class="value"><span id="prt">0</span><span class="unit">s</span></div></div>
-    <div class="card"><div class="label">Secrets Mgmt Overhead (SMO)</div><div class="value"><span id="smo">0</span><span class="unit">s</span></div></div>
-    <div class="card"><div class="label">Dynamic Env Time (DEPT)</div><div class="value"><span id="dept">0</span><span class="unit">s</span></div></div>
-    <div class="card"><div class="label">Cross-Layer Consistency (CLBC)</div><div class="value"><span id="clbc">0</span><span class="unit">%</span></div></div>
+    <div class="card">
+      <div class="label">Layer Cache Efficiency (LCE)</div>
+      <div class="value"><span id="lce">0</span><span class="unit">%</span></div>
+    </div>
+    <div class="card">
+      <div class="label">Pipeline Recovery Time (PRT)</div>
+      <div class="value"><span id="prt">0</span><span class="unit">s</span></div>
+    </div>
+    <div class="card">
+      <div class="label">Secrets Mgmt Overhead (SMO)</div>
+      <div class="value"><span id="smo">0</span><span class="unit">s</span></div>
+    </div>
+    <div class="card">
+      <div class="label">Dynamic Env Time (DEPT)</div>
+      <div class="value"><span id="dept">0</span><span class="unit">s</span></div>
+    </div>
+    <div class="card">
+      <div class="label">Cross-Layer Consistency (CLBC)</div>
+      <div class="value"><span id="clbc">0</span><span class="unit">%</span></div>
+    </div>
   </div>
 
   <div class="panel">
@@ -32,15 +117,38 @@
   </div>
 
   <script>
-    async function load(){
-      const res = await fetch('/api/metrics/data');
+    let currentSource = "github";
+    let chart = null;
+
+    function humanLabel(source) {
+      if (source === "jenkins") return "Jenkins";
+      if (source === "codepipeline") return "AWS CodePipeline";
+      return "GitHub Actions";
+    }
+
+    async function load(source) {
+      currentSource = source || "github";
+
+      // update tab UI
+      document.querySelectorAll(".tab").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.source === currentSource);
+      });
+      document.getElementById("activeLabel").innerHTML =
+        'Showing metrics for <strong>' + humanLabel(currentSource) + '</strong>';
+
+      // fetch data from backend
+      const url = `/api/metrics/data?source=${encodeURIComponent(currentSource)}`;
+      const res = await fetch(url);
       const d = await res.json();
-      document.getElementById('lce').textContent = d.avg_lce;
-      document.getElementById('prt').textContent = d.avg_prt;
-      document.getElementById('smo').textContent = d.avg_smo;
+
+      // cards
+      document.getElementById('lce').textContent  = d.avg_lce;
+      document.getElementById('prt').textContent  = d.avg_prt;
+      document.getElementById('smo').textContent  = d.avg_smo;
       document.getElementById('dept').textContent = d.avg_dept;
       document.getElementById('clbc').textContent = d.avg_clbc;
 
+      // chart
       const labels = d.rows.map(r => new Date(r.t).toLocaleTimeString());
       const datasets = [
         { label:'LCE (%)',  data:d.rows.map(r=>r.lce) },
@@ -48,15 +156,35 @@
         { label:'SMO (s)',  data:d.rows.map(r=>r.smo) },
         { label:'DEPT (s)', data:d.rows.map(r=>r.dept) },
         { label:'CLBC (%)', data:d.rows.map(r=>r.clbc) }
-      ].map(ds => ({ ...ds, borderWidth:2 }));
+      ].map(ds => ({ ...ds, borderWidth:2, fill:false }));
 
-      new Chart(document.getElementById('novelChart'), {
+      const ctx = document.getElementById('novelChart').getContext('2d');
+
+      if (chart) {
+        chart.destroy();
+      }
+
+      chart = new Chart(ctx, {
         type:'line',
         data:{ labels, datasets },
-        options:{ responsive:true, interaction:{mode:'index',intersect:false}, plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true}} }
+        options:{
+          responsive:true,
+          interaction:{mode:'index',intersect:false},
+          plugins:{legend:{position:'bottom'}},
+          scales:{y:{beginAtZero:true}}
+        }
       });
     }
-    load();
+
+    // Tab click listeners
+    document.querySelectorAll(".tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        load(btn.dataset.source);
+      });
+    });
+
+    // initial load
+    load("github");
   </script>
 </body>
 </html>

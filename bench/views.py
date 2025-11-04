@@ -1,8 +1,11 @@
 import json
 import statistics
+
 from django.conf import settings
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+
 from .models import Metric
 
 
@@ -22,6 +25,7 @@ def api_ingest(request):
     if api_key != settings.BENCH_API_KEY:
         return JsonResponse({"error": "Unauthorized"}, status=403)
 
+    # Create a Metric row. We keep your existing field names.
     Metric.objects.create(
         source=payload.get("source", "manual"),
         workflow=payload.get("workflow", ""),
@@ -39,8 +43,22 @@ def api_ingest(request):
 
 
 def api_metrics_data(request):
-    """Return aggregated metrics for dashboard display."""
-    qs = Metric.objects.order_by("-created_at")[:100]
+    """
+    Return aggregated metrics for dashboard display.
+
+    Optional query param:
+      ?source=github|jenkins|codepipeline
+
+    so the front-end can filter per CI/CD pipeline.
+    """
+    source = request.GET.get("source")
+    qs = Metric.objects.order_by("-created_at")
+
+    if source:
+        qs = qs.filter(source=source)
+
+    qs = qs[:100]
+
     rows = [
         {
             "t": m.created_at.isoformat(),
@@ -59,16 +77,20 @@ def api_metrics_data(request):
 
     data = {
         "count": Metric.objects.count(),
-        "avg_lce":  avg([r["lce"] for r in rows]),
-        "avg_prt":  avg([r["prt"] for r in rows]),
-        "avg_smo":  avg([r["smo"] for r in rows]),
+        "avg_lce": avg([r["lce"] for r in rows]),
+        "avg_prt": avg([r["prt"] for r in rows]),
+        "avg_smo": avg([r["smo"] for r in rows]),
         "avg_dept": avg([r["dept"] for r in rows]),
         "avg_clbc": avg([r["clbc"] for r in rows]),
         "rows": rows,
     }
     return JsonResponse(data)
-from django.shortcuts import render
+
 
 def dashboard(request):
+    """
+    Render the dashboard shell (HTML/JS).
+    The page itself is static; it calls /api/metrics/data via JS,
+    passing ?source=... depending on which tab is clicked.
+    """
     return render(request, "bench/dashboard.html")
-
