@@ -1,119 +1,340 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>CI/CD Novel Metrics Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-           margin: 24px; background: #f7f9fb; }
-    h1 { margin-bottom: 16px; }
+    :root {
+      --bg: #f4f6fb;
+      --surface: #ffffff;
+      --accent: #2563eb;
+      --accent-soft: #e0edff;
+      --text-main: #0f172a;
+      --text-muted: #6b7280;
+      --border-subtle: #e5e7eb;
+      --card-radius: 14px;
+      --shadow-soft: 0 8px 20px rgba(15, 23, 42, 0.06);
+    }
 
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
+    * {
+      box-sizing: border-box;
     }
-    .card {
-      background: #fff;
-      border-radius: 12px;
-      padding: 14px 16px;
-      box-shadow: 0 2px 6px rgba(0,0,0,.08);
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, #e0edff, #f9fafb 40%, #f3f4f6);
+      color: var(--text-main);
     }
-    .label {
-      color: #777;
-      text-transform: uppercase;
+
+    .shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 20px 40px;
+    }
+
+    .header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .title {
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .subtitle-main {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .meta {
       font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: right;
     }
-    .value {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-top: 6px;
+
+    .meta span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.06);
     }
-    .unit {
-      font-size: 0.9rem;
-      color: #999;
-      margin-left: 3px;
-    }
-    .panel {
-      background: #fff;
-      border-radius: 12px;
-      padding: 16px;
-      margin-top: 20px;
-      box-shadow: 0 2px 6px rgba(0,0,0,.08);
+
+    .meta-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #22c55e;
     }
 
     /* Tabs */
+    .tabs-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 12px;
+    }
+
     .tabs {
       display: inline-flex;
       border-radius: 999px;
-      background: #e5edf7;
-      padding: 4px;
-      margin-bottom: 16px;
+      background: rgba(148, 163, 184, 0.16);
+      padding: 3px;
     }
+
     .tab {
       border: none;
       background: transparent;
-      padding: 6px 14px;
+      padding: 7px 18px;
       border-radius: 999px;
       cursor: pointer;
       font-size: 0.9rem;
-      color: #365074;
+      color: #475569;
+      transition: all 0.15s ease-out;
+      white-space: nowrap;
     }
+
+    .tab:hover {
+      background: rgba(255,255,255,0.6);
+    }
+
     .tab.active {
-      background: #ffffff;
-      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+      background: var(--surface);
+      box-shadow: 0 1px 5px rgba(15,23,42,0.12);
       font-weight: 600;
-      color: #0f172a;
+      color: var(--accent);
     }
-    .subtitle {
-      color: #6b7280;
+
+    .active-label {
       font-size: 0.9rem;
-      margin-bottom: 12px;
+      color: var(--text-muted);
+    }
+
+    .active-label strong {
+      color: var(--accent);
+    }
+
+    /* Cards */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      background: var(--surface);
+      border-radius: var(--card-radius);
+      padding: 14px 16px 12px;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 55%);
+      opacity: 0.9;
+      pointer-events: none;
+    }
+
+    .card-inner {
+      position: relative;
+      z-index: 1;
+    }
+
+    .label {
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    .value-row {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .value {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    .unit {
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.75rem;
+      margin-top: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.03);
+      color: #4b5563;
+    }
+
+    /* Panel / chart */
+    .panel {
+      background: var(--surface);
+      border-radius: var(--card-radius);
+      padding: 16px 18px 18px;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .panel-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .panel-caption {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    canvas {
+      max-height: 320px;
+    }
+
+    @media (max-width: 640px) {
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .tabs-bar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .meta {
+        text-align: left;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>Novel Metrics Dashboard</h1>
+  <div class="shell">
+    <header class="header">
+      <div>
+        <div class="title">Novel Metrics Dashboard</div>
+        <div class="subtitle-main">
+          Comparing CI/CD health across pipelines using your novel metrics.
+        </div>
+      </div>
+      <div class="meta">
+        <span><span class="meta-dot"></span>Live from latest runs</span>
+      </div>
+    </header>
 
-  <!-- Pipeline tabs -->
-  <div class="tabs">
-    <button class="tab active" data-source="github">GitHub Actions</button>
-    <button class="tab" data-source="jenkins">Jenkins</button>
-    <button class="tab" data-source="codepipeline">AWS CodePipeline</button>
-  </div>
+    <section class="tabs-bar">
+      <div class="tabs">
+        <button class="tab active" data-source="github">GitHub Actions</button>
+        <button class="tab" data-source="jenkins">Jenkins</button>
+        <button class="tab" data-source="codepipeline">AWS CodePipeline</button>
+      </div>
+      <div class="active-label" id="activeLabel">
+        Showing metrics for <strong>GitHub Actions</strong>
+      </div>
+    </section>
 
-  <div class="subtitle" id="activeLabel">
-    Showing metrics for <strong>GitHub Actions</strong>
-  </div>
+    <section class="cards">
+      <article class="card">
+        <div class="card-inner">
+          <div class="label">Layer Cache Efficiency (LCE)</div>
+          <div class="value-row">
+            <div class="value" id="lce">0</div>
+            <div class="unit">%</div>
+          </div>
+          <div class="chip">Higher is better – reuse of cached build layers</div>
+        </div>
+      </article>
 
-  <div class="cards">
-    <div class="card">
-      <div class="label">Layer Cache Efficiency (LCE)</div>
-      <div class="value"><span id="lce">0</span><span class="unit">%</span></div>
-    </div>
-    <div class="card">
-      <div class="label">Pipeline Recovery Time (PRT)</div>
-      <div class="value"><span id="prt">0</span><span class="unit">s</span></div>
-    </div>
-    <div class="card">
-      <div class="label">Secrets Mgmt Overhead (SMO)</div>
-      <div class="value"><span id="smo">0</span><span class="unit">s</span></div>
-    </div>
-    <div class="card">
-      <div class="label">Dynamic Env Time (DEPT)</div>
-      <div class="value"><span id="dept">0</span><span class="unit">s</span></div>
-    </div>
-    <div class="card">
-      <div class="label">Cross-Layer Consistency (CLBC)</div>
-      <div class="value"><span id="clbc">0</span><span class="unit">%</span></div>
-    </div>
-  </div>
+      <article class="card">
+        <div class="card-inner">
+          <div class="label">Pipeline Recovery Time (PRT)</div>
+          <div class="value-row">
+            <div class="value" id="prt">0</div>
+            <div class="unit">s</div>
+          </div>
+          <div class="chip">Time from failure to healthy redeploy</div>
+        </div>
+      </article>
 
-  <div class="panel">
-    <h3>Novel Metrics Trends</h3>
-    <canvas id="novelChart" height="120"></canvas>
+      <article class="card">
+        <div class="card-inner">
+          <div class="label">Secrets Mgmt Overhead (SMO)</div>
+          <div class="value-row">
+            <div class="value" id="smo">0</div>
+            <div class="unit">s</div>
+          </div>
+          <div class="chip">Cost of fetching / rotating secrets per run</div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-inner">
+          <div class="label">Dynamic Env Time (DEPT)</div>
+          <div class="value-row">
+            <div class="value" id="dept">0</div>
+            <div class="unit">s</div>
+          </div>
+          <div class="chip">Provisioning time for ephemeral environments</div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-inner">
+          <div class="label">Cross-Layer Consistency (CLBC)</div>
+          <div class="value-row">
+            <div class="value" id="clbc">0</div>
+            <div class="unit">%</div>
+          </div>
+          <div class="chip">Alignment of config across build, test & deploy</div>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Novel Metrics Trends</div>
+          <div class="panel-caption">
+            Time-series of the last 100 runs for the selected pipeline.
+          </div>
+        </div>
+      </div>
+      <canvas id="novelChart"></canvas>
+    </section>
   </div>
 
   <script>
@@ -129,61 +350,92 @@
     async function load(source) {
       currentSource = source || "github";
 
-      // update tab UI
+      // Update tab states
       document.querySelectorAll(".tab").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.source === currentSource);
       });
       document.getElementById("activeLabel").innerHTML =
         'Showing metrics for <strong>' + humanLabel(currentSource) + '</strong>';
 
-      // fetch data from backend
+      // Fetch data from backend (includes ?source=… filter)
       const url = `/api/metrics/data?source=${encodeURIComponent(currentSource)}`;
       const res = await fetch(url);
       const d = await res.json();
 
-      // cards
-      document.getElementById('lce').textContent  = d.avg_lce;
-      document.getElementById('prt').textContent  = d.avg_prt;
-      document.getElementById('smo').textContent  = d.avg_smo;
-      document.getElementById('dept').textContent = d.avg_dept;
-      document.getElementById('clbc').textContent = d.avg_clbc;
+      // Update cards
+      document.getElementById("lce").textContent  = d.avg_lce;
+      document.getElementById("prt").textContent  = d.avg_prt;
+      document.getElementById("smo").textContent  = d.avg_smo;
+      document.getElementById("dept").textContent = d.avg_dept;
+      document.getElementById("clbc").textContent = d.avg_clbc;
 
-      // chart
+      // Build chart data
       const labels = d.rows.map(r => new Date(r.t).toLocaleTimeString());
       const datasets = [
-        { label:'LCE (%)',  data:d.rows.map(r=>r.lce) },
-        { label:'PRT (s)',  data:d.rows.map(r=>r.prt) },
-        { label:'SMO (s)',  data:d.rows.map(r=>r.smo) },
-        { label:'DEPT (s)', data:d.rows.map(r=>r.dept) },
-        { label:'CLBC (%)', data:d.rows.map(r=>r.clbc) }
-      ].map(ds => ({ ...ds, borderWidth:2, fill:false }));
+        { label: "LCE (%)",  data: d.rows.map(r => r.lce)  },
+        { label: "PRT (s)",  data: d.rows.map(r => r.prt)  },
+        { label: "SMO (s)",  data: d.rows.map(r => r.smo)  },
+        { label: "DEPT (s)", data: d.rows.map(r => r.dept) },
+        { label: "CLBC (%)", data: d.rows.map(r => r.clbc) }
+      ].map(ds => ({
+        ...ds,
+        borderWidth: 2,
+        pointRadius: 3,
+        pointHoverRadius: 4,
+        tension: 0.35,     // smooth curves (visually “increasing”/continuous)
+        fill: false
+      }));
 
-      const ctx = document.getElementById('novelChart').getContext('2d');
+      const ctx = document.getElementById("novelChart").getContext("2d");
 
       if (chart) {
         chart.destroy();
       }
 
       chart = new Chart(ctx, {
-        type:'line',
-        data:{ labels, datasets },
-        options:{
-          responsive:true,
-          interaction:{mode:'index',intersect:false},
-          plugins:{legend:{position:'bottom'}},
-          scales:{y:{beginAtZero:true}}
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: { position: "bottom" },
+            tooltip: {
+              callbacks: {
+                // prettier tooltip labels
+                label: function(context) {
+                  const label = context.dataset.label || "";
+                  const value = context.parsed.y;
+                  return `${label}: ${value}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: "rgba(148, 163, 184, 0.25)"
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              }
+            }
+          }
         }
       });
     }
 
-    // Tab click listeners
+    // Attach tab handlers
     document.querySelectorAll(".tab").forEach(btn => {
       btn.addEventListener("click", () => {
         load(btn.dataset.source);
       });
     });
 
-    // initial load
+    // Initial load
     load("github");
   </script>
 </body>
