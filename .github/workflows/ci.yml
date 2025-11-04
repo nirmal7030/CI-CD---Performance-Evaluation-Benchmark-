@@ -56,7 +56,7 @@ jobs:
       # ---- measure deploy time (SSM build+run) ----
       - name: Redeploy container on EC2 via SSM (timed)
         id: deploy_step
-        continue-on-error: true   # <<< IMPORTANT: don't fail whole job if SSM marks it Failed
+        continue-on-error: true   # don't fail whole job if SSM waiter reports "Failed"
         env:
           EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
           SECRET_KEY:      ${{ secrets.SECRET_KEY }}
@@ -100,7 +100,7 @@ jobs:
           # Because we set continue-on-error: true, the workflow won't stop.
           aws ssm wait command-executed \
             --command-id "$CMD_ID" \
-            --instance-id "$EC2_INSTANCE_ID" || echo "SSM waiter reported failure (non-zero exit); continuing anyway."
+            --instance-id "$EC2_INSTANCE_ID" || echo "SSM waiter reported failure; continuing anyway."
 
           END=$(date +%s)
           echo "deploy_duration=$((END-START))" >> "$GITHUB_OUTPUT"
@@ -108,7 +108,7 @@ jobs:
       # ---- POST NOVEL METRICS (LCE, PRT, SMO, DEPT, CLBC) TO DJANGO ----
       - name: Post novel metrics to app
         env:
-          APP_BASE_URL:  ${{ secrets.APP_BASE_URL }}   # e.g. http://ec2-100-28-220-183.compute-1.amazonaws.com
+          APP_BASE_URL:  ${{ secrets.APP_BASE_URL }}   # e.g. http://ec2-98-93-42-151.compute-1.amazonaws.com
           BENCH_API_KEY: ${{ secrets.BENCH_API_KEY }}
           BUILD_DUR:     ${{ needs.test.outputs.build_duration }}
           TEST_DUR:      ${{ needs.test.outputs.test_duration }}
@@ -116,8 +116,24 @@ jobs:
         run: |
           set -e
 
-          BASE_URL="$APP_BASE_URL"
-          echo "Using BASE_URL=$BASE_URL (masked in logs by GitHub)"
+          # --- Sanitise APP_BASE_URL so curl always gets a valid URL ---
+          RAW_URL="$APP_BASE_URL"
+
+          # Strip quotes and whitespace that might have been typed into the secret
+          BASE_URL="$(echo "$RAW_URL" | tr -d '\"'\''[:space:]')"
+
+          if [ -z "$BASE_URL" ]; then
+            echo "ERROR: APP_BASE_URL secret is empty after sanitising."
+            exit 1
+          fi
+
+          # If it doesn't start with http:// or https://, assume http://
+          case "$BASE_URL" in
+            http://*|https://*) ;;
+            *) BASE_URL="http://$BASE_URL" ;;
+          esac
+
+          echo "Using BASE_URL=$BASE_URL (GitHub will mask the host in logs)"
 
           # Ensure numeric defaults
           BUILD_DUR=${BUILD_DUR:-0}
