@@ -1,29 +1,57 @@
-@'
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.*
-crash.log
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-.terraform.lock.hcl
+.venv) PS C:\projects\cicd-benchmark> git status
+On branch main
+Your branch is up to date with 'origin/main'.
 
-# Python / Django
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)     
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   .github/workflows/ci.yml
+        modified:   README.md
+        modified:   bench/__pycache__/admin.cpython-313.pyc      
+        modified:   bench/__pycache__/apps.cpython-313.pyc       
+        modified:   bench/__pycache__/models.cpython-313.pyc     
+        modified:   bench/__pycache__/views.cpython-313.pyc      
+        modified:   bench/admin.py
+        modified:   bench/apps.py
+        modified:   bench/models.py
+        modified:   bench/views.py
+        modified:   core/__pycache__/admin.cpython-313.pyc       
+        modified:   core/__pycache__/models.cpython-313.pyc      
+        modified:   core/admin.py
+        modified:   core/models.py
+        modified:   db.sqlite3
+        modified:   manage.py
+        modified:   webapp/__pycache__/settings.cpython-313.pyc  
+        modified:   webapp/__pycache__/urls.cpython-313.pyc      
+        modified:   webapp/settings.py
+        modified:   webapp/urls.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed) 
+        bench/migrations/0002_metric_delete_run.py
+        bench/migrations/0003_alter_metric_options_metric_cross_layer_consistency_and_more.py
+        bench/urls.py
+        core/migrations/0001_initial.py
+        templates/
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+# Python cache
 __pycache__/
 *.py[cod]
-*.egg-info/
-db.sqlite3
-staticfiles/
-media/
+*.pyo
 
-# Test cache
+# Django database
+db.sqlite3
+
+# Virtual environment
+.venv/
+
+# Pytest cache
 .pytest_cache/
 
-# Envs & IDE
-.venv/
-env/
-venv/
-.vscode/
-'@ | Out-File -Encoding UTF8 .gitignore
+# Terraform files
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+.terraform.lock.hcl
