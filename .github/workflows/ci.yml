@@ -108,7 +108,12 @@ jobs:
       # ---- POST NOVEL METRICS (LCE, PRT, SMO, DEPT, CLBC) TO DJANGO ----
       - name: Post novel metrics to app
         env:
-          APP_BASE_URL:  ${{ secrets.APP_BASE_URL }}   # e.g. http://ec2-98-93-42-151.compute-1.amazonaws.com
+          # IMPORTANT:
+          # Set APP_BASE_URL secret to your EC2 public DNS, e.g.
+          #   ec2-44-210-105-106.compute-1.amazonaws.com
+          # or:
+          #   http://ec2-44-210-105-106.compute-1.amazonaws.com
+          APP_BASE_URL:  ${{ secrets.APP_BASE_URL }}
           BENCH_API_KEY: ${{ secrets.BENCH_API_KEY }}
           BUILD_DUR:     ${{ needs.test.outputs.build_duration }}
           TEST_DUR:      ${{ needs.test.outputs.test_duration }}
