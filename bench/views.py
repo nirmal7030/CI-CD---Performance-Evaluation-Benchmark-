@@ -17,7 +17,8 @@ def api_ingest(request):
 
     try:
         # request.body is bytes; decode safely
-        payload = json.loads(request.body.decode("utf-8") or "{}")
+        raw = request.body.decode("utf-8") or "{}"
+        payload = json.loads(raw)
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
@@ -26,20 +27,28 @@ def api_ingest(request):
     if api_key != settings.BENCH_API_KEY:
         return JsonResponse({"error": "Unauthorized"}, status=403)
 
+    # Helper: support both short and long keys in payload, just in case
+    def get_metric_val(short_key: str, long_key: str):
+        if short_key in payload:
+            return payload.get(short_key)
+        if long_key in payload:
+            return payload.get(long_key)
+        return None
+
     # ✅ Use your actual model fields (short names)
     metric = Metric.objects.create(
-        source=payload.get("source", "manual"),
+        source=payload.get("source", "github"),
         workflow=payload.get("workflow", ""),
         run_id=payload.get("run_id", ""),
         branch=payload.get("branch", ""),
         commit_sha=payload.get("commit_sha", ""),
 
-        # Match actual DB field names exactly
-        lce=payload.get("lce"),
-        prt=payload.get("prt"),
-        smo=payload.get("smo"),
-        dept=payload.get("dept"),
-        clbc=payload.get("clbc"),
+        # Match actual DB/model field names exactly (short names)
+        lce=get_metric_val("lce", "layer_cache_efficiency"),
+        prt=get_metric_val("prt", "pipeline_recovery_time"),
+        smo=get_metric_val("smo", "secrets_mgmt_overhead"),
+        dept=get_metric_val("dept", "dynamic_env_time"),
+        clbc=get_metric_val("clbc", "cross_layer_consistency"),
 
         notes=payload.get("notes", ""),
     )
