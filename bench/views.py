@@ -16,7 +16,8 @@ def api_ingest(request):
         return JsonResponse({"error": "POST only"}, status=405)
 
     try:
-        payload = json.loads(request.body)
+        # safer decode: Django request.body is bytes
+        payload = json.loads(request.body.decode("utf-8") or "{}")
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
@@ -25,21 +26,24 @@ def api_ingest(request):
     if api_key != settings.BENCH_API_KEY:
         return JsonResponse({"error": "Unauthorized"}, status=403)
 
-    # Create a Metric row. We keep your existing field names.
-    Metric.objects.create(
+    # IMPORTANT: use the actual field names on Metric model
+    metric = Metric.objects.create(
         source=payload.get("source", "manual"),
         workflow=payload.get("workflow", ""),
         run_id=payload.get("run_id", ""),
         branch=payload.get("branch", ""),
         commit_sha=payload.get("commit_sha", ""),
-        layer_cache_efficiency=payload.get("lce"),
-        pipeline_recovery_time=payload.get("prt"),
-        secrets_mgmt_overhead=payload.get("smo"),
-        dynamic_env_time=payload.get("dept"),
-        cross_layer_consistency=payload.get("clbc"),
+
+        # short metric fields that exist on the model:
+        lce=payload.get("lce"),
+        prt=payload.get("prt"),
+        smo=payload.get("smo"),
+        dept=payload.get("dept"),
+        clbc=payload.get("clbc"),
+
         notes=payload.get("notes", ""),
     )
-    return JsonResponse({"status": "stored"})
+    return JsonResponse({"status": "stored", "id": metric.id})
 
 
 def api_metrics_data(request):
@@ -59,14 +63,15 @@ def api_metrics_data(request):
 
     qs = qs[:100]
 
+    # NOTE: read from the short field names on the model
     rows = [
         {
             "t": m.created_at.isoformat(),
-            "lce": m.layer_cache_efficiency,
-            "prt": m.pipeline_recovery_time,
-            "smo": m.secrets_mgmt_overhead,
-            "dept": m.dynamic_env_time,
-            "clbc": m.cross_layer_consistency,
+            "lce": m.lce,
+            "prt": m.prt,
+            "smo": m.smo,
+            "dept": m.dept,
+            "clbc": m.clbc,
         }
         for m in reversed(qs)
     ]
