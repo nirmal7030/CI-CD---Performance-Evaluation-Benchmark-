@@ -80,7 +80,8 @@ jobs:
                 -e SECRET_KEY=$SECRET_KEY \
                 -e ALLOWED_HOSTS=* \
                 -e BENCH_API_KEY=$BENCH_API_KEY \
-                cicd-benchmark:prod"
+                cicd-benchmark:prod",
+              "/usr/bin/docker exec cicdbench python manage.py migrate --noinput"
             ]
           }
           EOF
