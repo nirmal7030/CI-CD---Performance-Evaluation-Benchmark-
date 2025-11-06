@@ -1,9 +1,11 @@
-#!/usr/bin/env sh
+#!/bin/sh
 set -e
 
-# Apply migrations & collect static (idempotent)
+echo "Running database migrations..."
 python manage.py migrate --noinput
+
+echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
-# Start Gunicorn
-exec gunicorn webapp.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60
+echo "Starting Gunicorn..."
+gunicorn webapp.wsgi:application --bind 0.0.0.0:8000

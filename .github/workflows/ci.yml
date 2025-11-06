@@ -109,11 +109,6 @@ jobs:
       # ---- POST NOVEL METRICS (LCE, PRT, SMO, DEPT, CLBC) TO DJANGO ----
       - name: Post novel metrics to app
         env:
-          # IMPORTANT:
-          # Set APP_BASE_URL secret to your EC2 public DNS, e.g.
-          #   ec2-44-210-105-106.compute-1.amazonaws.com
-          # or:
-          #   http://ec2-44-210-105-106.compute-1.amazonaws.com
           APP_BASE_URL:  ${{ secrets.APP_BASE_URL }}
           BENCH_API_KEY: ${{ secrets.BENCH_API_KEY }}
           BUILD_DUR:     ${{ needs.test.outputs.build_duration }}
@@ -122,10 +117,7 @@ jobs:
         run: |
           set -e
 
-          # --- Sanitise APP_BASE_URL so curl always gets a valid URL ---
           RAW_URL="$APP_BASE_URL"
-
-          # Strip quotes and whitespace that might have been typed into the secret
           BASE_URL="$(echo "$RAW_URL" | tr -d '\"'\''[:space:]')"
 
           if [ -z "$BASE_URL" ]; then
@@ -133,7 +125,6 @@ jobs:
             exit 1
           fi
 
-          # If it doesn't start with http:// or https://, assume http://
           case "$BASE_URL" in
             http://*|https://*) ;;
             *) BASE_URL="http://$BASE_URL" ;;
@@ -141,7 +132,6 @@ jobs:
 
           echo "Using BASE_URL=$BASE_URL (GitHub will mask the host in logs)"
 
-          # Ensure numeric defaults
           BUILD_DUR=${BUILD_DUR:-0}
           TEST_DUR=${TEST_DUR:-0}
           DEPLOY_DUR=${DEPLOY_DUR:-0}
@@ -150,25 +140,15 @@ jobs:
           echo "TEST_DUR=$TEST_DUR"
           echo "DEPLOY_DUR=$DEPLOY_DUR"
 
-          # ----- Simple approximations for your novel metrics -----
-          # LCE (Layer Cache Efficiency): high if build is fast
           LCE=$(( 100 - BUILD_DUR / 2 ))
           if [ "$LCE" -lt 0 ]; then LCE=0; fi
           if [ "$LCE" -gt 100 ]; then LCE=100; fi
 
-          # PRT (Pipeline Recovery Time): use deploy duration for now
           PRT=$DEPLOY_DUR
-
-          # SMO (Secrets Management Overhead): constant placeholder in seconds
           SMO=1
-
-          # DEPT (Dynamic Env Provisioning Time): use deploy duration
           DEPT=$DEPLOY_DUR
-
-          # CLBC (Cross-Layer Build Consistency): 100 if pipeline succeeded
           CLBC=100
 
-          # Build JSON payload for /api/metrics/ingest
           cat > payload.json <<EOF
           {
             "source": "github",
