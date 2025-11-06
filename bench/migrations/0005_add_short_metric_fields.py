@@ -1,4 +1,4 @@
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
@@ -7,30 +7,6 @@ class Migration(migrations.Migration):
         ("bench", "0004_alter_metric_options_and_more"),
     ]
 
-    operations = [
-        migrations.AddField(
-            model_name="metric",
-            name="lce",
-            field=models.FloatField(default=0.0),
-        ),
-        migrations.AddField(
-            model_name="metric",
-            name="prt",
-            field=models.FloatField(default=0.0),
-        ),
-        migrations.AddField(
-            model_name="metric",
-            name="smo",
-            field=models.FloatField(default=0.0),
-        ),
-        migrations.AddField(
-            model_name="metric",
-            name="dept",
-            field=models.FloatField(default=0.0),
-        ),
-        migrations.AddField(
-            model_name="metric",
-            name="clbc",
-            field=models.FloatField(default=0.0),
-        ),
-    ]
+    # No schema changes here. We keep using the original long field names
+    # on the Metric model (layer_cache_efficiency, pipeline_recovery_time, etc.)
+    operations = []

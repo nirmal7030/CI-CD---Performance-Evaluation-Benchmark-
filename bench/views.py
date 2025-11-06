@@ -16,7 +16,6 @@ def api_ingest(request):
         return JsonResponse({"error": "POST only"}, status=405)
 
     try:
-        # request.body is bytes; decode safely
         raw = request.body.decode("utf-8") or "{}"
         payload = json.loads(raw)
     except json.JSONDecodeError:
@@ -27,7 +26,7 @@ def api_ingest(request):
     if api_key != settings.BENCH_API_KEY:
         return JsonResponse({"error": "Unauthorized"}, status=403)
 
-    # Helper: support both short and long keys in payload, just in case
+    # Helper: support both short and long keys in payload
     def get_metric_val(short_key: str, long_key: str):
         if short_key in payload:
             return payload.get(short_key)
@@ -35,20 +34,20 @@ def api_ingest(request):
             return payload.get(long_key)
         return None
 
-    # ✅ Use your actual model fields (short names)
     metric = Metric.objects.create(
         source=payload.get("source", "github"),
         workflow=payload.get("workflow", ""),
         run_id=payload.get("run_id", ""),
+        run_attempt=payload.get("run_attempt", ""),
         branch=payload.get("branch", ""),
         commit_sha=payload.get("commit_sha", ""),
 
-        # Match actual DB/model field names exactly (short names)
-        lce=get_metric_val("lce", "layer_cache_efficiency"),
-        prt=get_metric_val("prt", "pipeline_recovery_time"),
-        smo=get_metric_val("smo", "secrets_mgmt_overhead"),
-        dept=get_metric_val("dept", "dynamic_env_time"),
-        clbc=get_metric_val("clbc", "cross_layer_consistency"),
+        # ✅ write into long field names that match DB columns
+        layer_cache_efficiency=get_metric_val("lce", "layer_cache_efficiency"),
+        pipeline_recovery_time=get_metric_val("prt", "pipeline_recovery_time"),
+        secrets_mgmt_overhead=get_metric_val("smo", "secrets_mgmt_overhead"),
+        dynamic_env_time=get_metric_val("dept", "dynamic_env_time"),
+        cross_layer_consistency=get_metric_val("clbc", "cross_layer_consistency"),
 
         notes=payload.get("notes", ""),
     )
@@ -70,14 +69,15 @@ def api_metrics_data(request):
 
     qs = qs[:100]
 
+    # Read from long field names on the model and expose short keys in JSON
     rows = [
         {
             "t": m.created_at.isoformat(),
-            "lce": m.lce,
-            "prt": m.prt,
-            "smo": m.smo,
-            "dept": m.dept,
-            "clbc": m.clbc,
+            "lce": m.layer_cache_efficiency,
+            "prt": m.pipeline_recovery_time,
+            "smo": m.secrets_mgmt_overhead,
+            "dept": m.dynamic_env_time,
+            "clbc": m.cross_layer_consistency,
         }
         for m in reversed(qs)
     ]
