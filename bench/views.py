@@ -26,7 +26,7 @@ def api_ingest(request):
     if api_key != settings.BENCH_API_KEY:
         return JsonResponse({"error": "Unauthorized"}, status=403)
 
-    # IMPORTANT: use the actual field names on Metric model
+    # ✅ Use your actual model fields (short names)
     metric = Metric.objects.create(
         source=payload.get("source", "manual"),
         workflow=payload.get("workflow", ""),
@@ -34,7 +34,7 @@ def api_ingest(request):
         branch=payload.get("branch", ""),
         commit_sha=payload.get("commit_sha", ""),
 
-        # these MUST match your model fields (short names)
+        # Match actual DB field names exactly
         lce=payload.get("lce"),
         prt=payload.get("prt"),
         smo=payload.get("smo"),
@@ -50,11 +50,8 @@ def api_ingest(request):
 def api_metrics_data(request):
     """
     Return aggregated metrics for dashboard display.
-
     Optional query param:
       ?source=github|jenkins|codepipeline
-
-    so the front-end can filter per CI/CD pipeline.
     """
     source = request.GET.get("source")
     qs = Metric.objects.order_by("-created_at")
@@ -64,7 +61,6 @@ def api_metrics_data(request):
 
     qs = qs[:100]
 
-    # Read from short field names on the model
     rows = [
         {
             "t": m.created_at.isoformat(),
@@ -96,7 +92,6 @@ def api_metrics_data(request):
 def dashboard(request):
     """
     Render the dashboard shell (HTML/JS).
-    The page itself is static; it calls /api/metrics/data via JS,
-    passing ?source=... depending on which tab is clicked.
+    The page itself is static; it calls /api/metrics/data via JS.
     """
     return render(request, "bench/dashboard.html")
