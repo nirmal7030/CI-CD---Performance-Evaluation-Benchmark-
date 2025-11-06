@@ -16,7 +16,7 @@ def api_ingest(request):
         return JsonResponse({"error": "POST only"}, status=405)
 
     try:
-        # safer decode: Django request.body is bytes
+        # request.body is bytes; decode safely
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
@@ -34,7 +34,7 @@ def api_ingest(request):
         branch=payload.get("branch", ""),
         commit_sha=payload.get("commit_sha", ""),
 
-        # short metric fields that exist on the model:
+        # these MUST match your model fields (short names)
         lce=payload.get("lce"),
         prt=payload.get("prt"),
         smo=payload.get("smo"),
@@ -43,6 +43,7 @@ def api_ingest(request):
 
         notes=payload.get("notes", ""),
     )
+
     return JsonResponse({"status": "stored", "id": metric.id})
 
 
@@ -63,7 +64,7 @@ def api_metrics_data(request):
 
     qs = qs[:100]
 
-    # NOTE: read from the short field names on the model
+    # Read from short field names on the model
     rows = [
         {
             "t": m.created_at.isoformat(),
